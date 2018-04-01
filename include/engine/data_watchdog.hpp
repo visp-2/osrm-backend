@@ -46,7 +46,7 @@ class DataWatchdogImpl<AlgorithmT, datafacade::ContiguousInternalMemoryDataFacad
             facade_factory =
                 DataFacadeFactory<datafacade::ContiguousInternalMemoryDataFacade, AlgorithmT>(
                     std::make_shared<datafacade::SharedMemoryAllocator>(barrier.data().region),
-                    timestamp); // I think I need to pass it in here too, is that true?
+                    timestamp);
         }
 
         watcher = std::thread(&DataWatchdogImpl::Run, this);
