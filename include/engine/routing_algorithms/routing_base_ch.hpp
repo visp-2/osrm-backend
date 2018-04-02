@@ -289,19 +289,21 @@ void unpackPath(const DataFacade<Algorithm> &facade,
     }
 }
 
+using PathAnnotation = std::pair<EdgeDuration, EdgeDistance>;
 template <typename BidirectionalIterator>
-EdgeDuration calculateEBGNodeAnnotations(const DataFacade<Algorithm> &facade,
-                                         BidirectionalIterator packed_path_begin,
-                                         BidirectionalIterator packed_path_end,
-                                         UnpackingCache &unpacking_cache)
+PathAnnotation calculateEBGNodeAnnotations(const DataFacade<Algorithm> &facade,
+                                           BidirectionalIterator packed_path_begin,
+                                           BidirectionalIterator packed_path_end,
+                                           UnpackingCache &unpacking_cache)
 {
     // make sure we have at least something to unpack
     if (packed_path_begin == packed_path_end ||
         std::distance(packed_path_begin, packed_path_end) <= 1)
-        return 0;
+        return std::make_pair(0, 0);
 
     std::stack<std::tuple<NodeID, NodeID, bool>> recursion_stack;
     std::stack<EdgeDuration> duration_stack;
+    std::stack<EdgeDistance> distance_stack;
 
     // We have to push the path in reverse order onto the stack because it's LIFO.
     for (auto current = std::prev(packed_path_end); current != packed_path_begin;
@@ -326,9 +328,10 @@ EdgeDuration calculateEBGNodeAnnotations(const DataFacade<Algorithm> &facade,
             if (unpacking_cache.IsEdgeInCache(std::make_tuple(
                     std::get<0>(edge), std::get<1>(edge), facade.GetExcludeIndex())))
             {
-                EdgeDuration duration = unpacking_cache.GetDuration(std::make_tuple(
+                PathAnnotation annotation = unpacking_cache.GetAnnotation(std::make_tuple(
                     std::get<0>(edge), std::get<1>(edge), facade.GetExcludeIndex()));
-                duration_stack.emplace(duration);
+                duration_stack.emplace(annotation.first);
+                distance_stack.emplace(annotation.second);
             }
             else
             {
@@ -369,14 +372,17 @@ EdgeDuration calculateEBGNodeAnnotations(const DataFacade<Algorithm> &facade,
                 }
                 else
                 {
-                    auto temp = std::make_tuple(
+                    auto new_edge = std::make_tuple(
                         std::get<0>(edge), std::get<1>(edge), facade.GetExcludeIndex());
                     // compute the duration here and put it onto the duration stack using method
                     // similar to annotatePath but smaller
                     EdgeDuration duration =
                         computeEdgeDuration(facade, std::get<0>(edge), data.turn_id);
+                    EdgeDistance distance =
+                        computeEdgeDistance(facade, std::get<0>(edge), std::get<1>(edge));
                     duration_stack.emplace(duration);
-                    unpacking_cache.AddEdge(temp, duration);
+                    distance_stack.emplace(distance);
+                    unpacking_cache.AddEdge(new_edge, std::make_pair(duration, distance));
                 }
             }
         }
@@ -391,9 +397,19 @@ EdgeDuration calculateEBGNodeAnnotations(const DataFacade<Algorithm> &facade,
             duration_stack.pop();
             EdgeDuration duration = edge1 + edge2;
             duration_stack.emplace(duration);
+
+            BOOST_ASSERT_MSG(distance_stack.size() >= 2,
+                             "There are not enough (at least 2) values on the distance stack");
+            EdgeDistance distance1 = distance_stack.top();
+            distance_stack.pop();
+            EdgeDistance distance2 = distance_stack.top();
+            distance_stack.pop();
+            EdgeDistance distance = distance1 + distance2;
+            distance_stack.emplace(distance);
+
             unpacking_cache.AddEdge(
                 std::make_tuple(std::get<0>(edge), std::get<1>(edge), facade.GetExcludeIndex()),
-                duration);
+                std::make_pair(duration, distance));
         }
     }
 
@@ -403,7 +419,15 @@ EdgeDuration calculateEBGNodeAnnotations(const DataFacade<Algorithm> &facade,
         total_duration += duration_stack.top();
         duration_stack.pop();
     }
-    return total_duration;
+
+    EdgeDistance total_distance = 0;
+    while (!distance_stack.empty())
+    {
+        total_distance += distance_stack.top();
+        distance_stack.pop();
+    }
+
+    return std::make_pair(total_duration, total_distance);
 }
 
 template <typename RandomIter, typename FacadeT>

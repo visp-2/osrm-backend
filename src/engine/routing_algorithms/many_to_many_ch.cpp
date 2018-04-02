@@ -220,6 +220,7 @@ std::vector<EdgeDuration> manyToManySearch(SearchEngineData<ch::Algorithm> &engi
 
     std::vector<EdgeWeight> weights_table(number_of_entries, INVALID_EDGE_WEIGHT);
     std::vector<EdgeDuration> durations_table(number_of_entries, MAXIMAL_EDGE_DURATION);
+    std::vector<EdgeDistance> distance_table(number_of_entries, MAXIMAL_EDGE_DISTANCE);
     std::vector<NodeID> middle_nodes_table(number_of_entries, SPECIAL_NODEID);
 
     std::vector<NodeBucket> search_space_with_buckets;
@@ -281,6 +282,7 @@ std::vector<EdgeDuration> manyToManySearch(SearchEngineData<ch::Algorithm> &engi
             if (source_index == target_index)
             {
                 durations_table[row_idx * number_of_targets + column_idx] = 0;
+                distance_table[row_idx * number_of_targets + column_idx] = 0.0;
                 continue;
             }
 
@@ -289,7 +291,10 @@ std::vector<EdgeDuration> manyToManySearch(SearchEngineData<ch::Algorithm> &engi
 
             if (middle_node_id == SPECIAL_NODEID) // takes care of one-ways
             {
-                durations_table[row_idx * number_of_targets + column_idx] = MAXIMAL_EDGE_DURATION;
+                durations_table[row_idx * number_of_targets + column_idx] =
+                    MAXIMAL_EDGE_DURATION; // should this be invalid edge duration? what is the
+                                           // difference between maximal and invalid?
+                distance_table[row_idx * number_of_targets + column_idx] = MAXIMAL_EDGE_DISTANCE;
                 continue;
             }
 
@@ -317,11 +322,14 @@ std::vector<EdgeDuration> manyToManySearch(SearchEngineData<ch::Algorithm> &engi
             }
             if (!packed_leg.empty())
             {
-                durations_table[row_idx * number_of_targets + column_idx] =
+                auto annotation =
                     ch::calculateEBGNodeAnnotations(facade,
                                                     packed_leg.begin(),
                                                     packed_leg.end(),
                                                     *engine_working_data.unpacking_cache.get());
+
+                durations_table[row_idx * number_of_targets + column_idx] = annotation.first;
+                distance_table[row_idx * number_of_targets + column_idx] = annotation.second;
 
                 // check the direction of travel to figure out how to calculate the offset to/from
                 // the source/target
@@ -364,6 +372,10 @@ std::vector<EdgeDuration> manyToManySearch(SearchEngineData<ch::Algorithm> &engi
             packed_leg.clear();
         }
     }
+    std::cout << "distance table: ";
+    for (auto it = distance_table.begin(); it != distance_table.end(); it++)
+        std::cout << *it << ", ";
+    std::cout << std::endl;
 
     return durations_table;
 }

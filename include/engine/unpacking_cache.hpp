@@ -10,14 +10,16 @@ namespace osrm
 {
 namespace engine
 {
+using PathAnnotation = std::pair<EdgeDuration, EdgeDistance>;
 class UnpackingCache
 {
   private:
-    boost::compute::detail::lru_cache<std::tuple<NodeID, NodeID, std::size_t>, EdgeDuration> cache;
+    boost::compute::detail::lru_cache<std::tuple<NodeID, NodeID, std::size_t>, PathAnnotation>
+        cache;
     unsigned current_data_timestamp = 0;
 
   public:
-    UnpackingCache(unsigned timestamp) : cache(200), current_data_timestamp(timestamp){};
+    UnpackingCache(unsigned timestamp) : cache(16000000), current_data_timestamp(timestamp){};
 
     void Clear(unsigned new_data_timestamp)
     {
@@ -33,15 +35,16 @@ class UnpackingCache
         return cache.contains(edge);
     }
 
-    void AddEdge(std::tuple<NodeID, NodeID, std::size_t> edge, EdgeDuration duration)
+    void AddEdge(std::tuple<NodeID, NodeID, std::size_t> edge, PathAnnotation annotation)
     {
-        cache.insert(edge, duration);
+        cache.insert(edge, annotation);
     }
 
-    EdgeDuration GetDuration(std::tuple<NodeID, NodeID, std::size_t> edge)
+    PathAnnotation GetAnnotation(std::tuple<NodeID, NodeID, std::size_t> edge)
     {
-        boost::optional<EdgeDuration> duration = cache.get(edge);
-        return *duration ? *duration : MAXIMAL_EDGE_DURATION;
+        boost::optional<PathAnnotation> annotation = cache.get(edge);
+        return annotation ? *annotation
+                          : std::make_pair(MAXIMAL_EDGE_DURATION, MAXIMAL_EDGE_DISTANCE);
     }
 };
 } // engine

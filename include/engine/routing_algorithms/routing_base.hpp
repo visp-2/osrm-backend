@@ -424,6 +424,47 @@ EdgeDuration computeEdgeDuration(const FacadeT &facade, NodeID node_id, NodeID t
     return total_duration;
 }
 
+template <typename FacadeT>
+EdgeDistance computeEdgeDistance(const FacadeT &facade, NodeID node_id_1, NodeID node_id_2)
+{
+    (void)node_id_2;
+    const auto geometry_index = facade.GetGeometryIndex(node_id_1);
+
+    // datastructures to hold extracted data from geometry
+    EdgeDistance total_distance = 0.0;
+
+    if (geometry_index.forward)
+    {
+        auto geometry_range = facade.GetUncompressedForwardGeometry(geometry_index.id);
+        for (auto current = geometry_range.begin() + 1; current != geometry_range.end(); ++current)
+        {
+            auto prev = current - 1;
+
+            const auto coordinate_1 = facade.GetCoordinateOfNode(*prev);
+            const auto coordinate_2 = facade.GetCoordinateOfNode(*current);
+
+            total_distance +=
+                util::coordinate_calculation::haversineDistance(coordinate_1, coordinate_2);
+        }
+    }
+    else
+    {
+        auto geometry_range = facade.GetUncompressedReverseDurations(geometry_index.id);
+        for (auto current = geometry_range.begin() + 1; current != geometry_range.end(); ++current)
+        {
+            auto prev = current - 1;
+
+            const auto coordinate_1 = facade.GetCoordinateOfNode(*prev);
+            const auto coordinate_2 = facade.GetCoordinateOfNode(*current);
+
+            total_distance +=
+                util::coordinate_calculation::haversineDistance(coordinate_1, coordinate_2);
+        }
+    }
+
+    return total_distance;
+}
+
 } // namespace routing_algorithms
 } // namespace engine
 } // namespace osrm

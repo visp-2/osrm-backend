@@ -448,6 +448,9 @@ template <typename RTreeT, typename DataFacadeT> class GeospatialQuery
         const auto forward_duration_range = datafacade.GetUncompressedForwardDurations(geometry_id);
         const auto reverse_duration_range = datafacade.GetUncompressedReverseDurations(geometry_id);
 
+        const auto forward_geometry_range = datafacade.GetUncompressedForwardGeometry(geometry_id);
+        const auto reverse_geometry_range = datafacade.GetUncompressedReverseGeometry(geometry_id);
+
         const auto forward_weight_offset =
             std::accumulate(forward_weight_range.begin(),
                             forward_weight_range.begin() + data.fwd_segment_position,
@@ -458,8 +461,27 @@ template <typename RTreeT, typename DataFacadeT> class GeospatialQuery
                             forward_duration_range.begin() + data.fwd_segment_position,
                             EdgeDuration{0});
 
+        // const auto forward_geometries_offset =
+        //     std::accumulate(forward_geometry_range.begin(),
+        //                     forward_geometry_range.begin() + data.fwd_segment_position,
+        //                     EdgeDistance{0});
+
+        const auto forward_distance_offset = 0;
+        for (auto current = forward_geometry_range.begin() + 1;
+             current != forward_geometry_range.begin() + data.fwd_segment_position + 1;
+             ++current)
+        {
+            auto prev = current - 1;
+
+            forward_distance_offset += util::coordinate_calculation::haversineDistance(
+                facade.GetCoordinateOfNode(*prev), facade.GetCoordinateOfNode(*current));
+        }
+
         EdgeWeight forward_weight = forward_weight_range[data.fwd_segment_position];
         EdgeDuration forward_duration = forward_duration_range[data.fwd_segment_position];
+        EdgeDistance forward_geometry = HaversineDistance(
+            facade.GetCoordinateOfNode(forward_geometry_range[data.fwd_segment_position]),
+            point_on_segment);
 
         BOOST_ASSERT(data.fwd_segment_position <
                      std::distance(forward_duration_range.begin(), forward_duration_range.end()));
@@ -474,10 +496,30 @@ template <typename RTreeT, typename DataFacadeT> class GeospatialQuery
                             reverse_duration_range.end() - data.fwd_segment_position - 1,
                             EdgeDuration{0});
 
+        // const auto reverse_geometries_offset =
+        //     std::accumulate(reverse_geometry_range.begin(),
+        //                     reverse_geometry_range.begin() + data.fwd_segment_position,
+        //                     EdgeDistance{0});
+
+        const auto reverse_distance_offset = 0;
+        for (auto current = reverse_geometry_range.begin() + 1;
+             current != reverse_geometry_range.begin() + data.fwd_segment_position + 1;
+             ++current)
+        {
+            auto prev = current - 1;
+
+            reverse_distance_offset += util::coordinate_calculation::haversineDistance(
+                facade.GetCoordinateOfNode(*prev), facade.GetCoordinateOfNode(*current));
+        }
+
         EdgeWeight reverse_weight =
             reverse_weight_range[reverse_weight_range.size() - data.fwd_segment_position - 1];
         EdgeDuration reverse_duration =
             reverse_duration_range[reverse_duration_range.size() - data.fwd_segment_position - 1];
+        EdgeDistance reverse_distance = HaversineDistance(
+            facade.GetCoordinateOfNode(reverse_geometry_range[reverse_geometry_range.size() -
+                                                              data.fwd_segment_position - 1]),
+            point_on_segment);
 
         ratio = std::min(1.0, std::max(0.0, ratio));
         if (data.forward_segment_id.id != SPECIAL_SEGMENTID)
@@ -516,6 +558,10 @@ template <typename RTreeT, typename DataFacadeT> class GeospatialQuery
                         reverse_duration,
                         forward_duration_offset,
                         reverse_duration_offset,
+                        forward_distance,
+                        reverse_distance,
+                        forward_distance_offset,
+                        reverse_distance_offset,
                         is_forward_valid_source,
                         is_forward_valid_target,
                         is_reverse_valid_source,

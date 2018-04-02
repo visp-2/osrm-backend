@@ -48,9 +48,12 @@ struct PhantomNode
           reverse_segment_id{SPECIAL_SEGMENTID, false}, forward_weight(INVALID_EDGE_WEIGHT),
           reverse_weight(INVALID_EDGE_WEIGHT), forward_weight_offset(0), reverse_weight_offset(0),
           forward_duration(MAXIMAL_EDGE_DURATION), reverse_duration(MAXIMAL_EDGE_DURATION),
-          forward_duration_offset(0), reverse_duration_offset(0), fwd_segment_position(0),
-          is_valid_forward_source{false}, is_valid_forward_target{false},
-          is_valid_reverse_source{false}, is_valid_reverse_target{false}, bearing(0)
+          forward_distance(MAXIMAL_EDGE_DISTANCE), reverse_distance(MAXIMAL_EDGE_DISTANCE),
+          forward_distance_offset(0), reverse_distance_offset(0), forward_duration_offset(0),
+          reverse_duration_offset(0), fwd_segment_position(0), is_valid_forward_source{false},
+          is_valid_forward_target{false}, is_valid_reverse_source{false},
+          is_valid_reverse_target{false}, bearing(0)
+
     {
     }
 
@@ -78,6 +81,20 @@ struct PhantomNode
         return reverse_duration + reverse_duration_offset;
     }
 
+    // DO THIS FOR DISTANCE
+
+    EdgeWeight GetForwardDistance() const
+    {
+        BOOST_ASSERT(forward_segment_id.enabled);
+        return forward_distance + forward_distance_offset;
+    }
+
+    EdgeWeight GetReverseDistance() const
+    {
+        BOOST_ASSERT(reverse_segment_id.enabled);
+        return reverse_distance + reverse_distance_offset;
+    }
+
     bool IsBidirected() const { return forward_segment_id.enabled && reverse_segment_id.enabled; }
 
     bool IsValid(const unsigned number_of_nodes) const
@@ -88,6 +105,8 @@ struct PhantomNode
                 (reverse_weight != INVALID_EDGE_WEIGHT)) &&
                ((forward_duration != MAXIMAL_EDGE_DURATION) ||
                 (reverse_duration != MAXIMAL_EDGE_DURATION)) &&
+               ((forward_distance != MAXIMAL_EDGE_DISTANCE) ||
+                (reverse_distance != MAXIMAL_EDGE_DISTANCE)) &&
                (component.id != INVALID_COMPONENTID);
     }
 
@@ -134,6 +153,10 @@ struct PhantomNode
                          EdgeWeight reverse_duration,
                          EdgeWeight forward_duration_offset,
                          EdgeWeight reverse_duration_offset,
+                         EdgeDistance forward_distance,
+                         EdgeDistance reverse_distance,
+                         EdgeDistance forward_distance_offset,
+                         EdgeDistance reverse_distance_offset,
                          bool is_valid_forward_source,
                          bool is_valid_forward_target,
                          bool is_valid_reverse_source,
@@ -146,7 +169,9 @@ struct PhantomNode
           reverse_weight{reverse_weight}, forward_weight_offset{forward_weight_offset},
           reverse_weight_offset{reverse_weight_offset}, forward_duration{forward_duration},
           reverse_duration{reverse_duration}, forward_duration_offset{forward_duration_offset},
-          reverse_duration_offset{reverse_duration_offset},
+          reverse_duration_offset{reverse_duration_offset}, forward_distance{forward_distance},
+          reverse_distance{reverse_distance}, forward_distance_offset{forward_distance_offset},
+          reverse_distance_offset{reverse_distance_offset},
           component{component.id, component.is_tiny}, location{location},
           input_location{input_location}, fwd_segment_position{other.fwd_segment_position},
           is_valid_forward_source{is_valid_forward_source},
@@ -162,13 +187,17 @@ struct PhantomNode
     EdgeWeight reverse_weight;
     EdgeWeight forward_weight_offset; // TODO: try to remove -> requires path unpacking changes
     EdgeWeight reverse_weight_offset; // TODO: try to remove -> requires path unpacking changes
+    EdgeDistance forward_distance;
+    EdgeDistance reverse_distance;
+    EdgeDistance forward_distance_offset;
+    EdgeDistance reverse_distance_offset;
     EdgeWeight forward_duration;
     EdgeWeight reverse_duration;
     EdgeWeight forward_duration_offset; // TODO: try to remove -> requires path unpacking changes
     EdgeWeight reverse_duration_offset; // TODO: try to remove -> requires path unpacking changes
     ComponentID component;
 
-    util::Coordinate location;
+    util::Coordinate location; // this is the coordinate of x
     util::Coordinate input_location;
     unsigned short fwd_segment_position;
     // is phantom node valid to be used as source or target
@@ -180,7 +209,7 @@ struct PhantomNode
     unsigned short bearing : 12;
 };
 
-static_assert(sizeof(PhantomNode) == 64, "PhantomNode has more padding then expected");
+static_assert(sizeof(PhantomNode) == 80, "PhantomNode has more padding then expected");
 
 using PhantomNodePair = std::pair<PhantomNode, PhantomNode>;
 
