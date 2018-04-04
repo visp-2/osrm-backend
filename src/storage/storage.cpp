@@ -119,24 +119,24 @@ int Storage::Run(int max_wait, const std::string &dataset_name)
 
     util::Log() << "Loading data into " << static_cast<int>(shm_key);
 
-    // Populate a memory layout into stack memory
-    DataLayout layout;
-    PopulateLayout(layout);
+    // Populate a memory static_layout into stack memory
+    DataLayout static_layout;
+    PopulateLayout(static_layout);
 
     io::BufferWriter writer;
-    serialization::write(writer, layout);
-    auto encoded_layout = writer.GetBuffer();
+    serialization::write(writer, static_layout);
+    auto encoded_static_layout = writer.GetBuffer();
 
     // Allocate shared memory block
-    auto regions_size = encoded_layout.size() + layout.GetSizeOfLayout();
-    util::Log() << "Data layout has a size of " << encoded_layout.size() << " bytes";
+    auto regions_size = encoded_static_layout.size() + static_layout.GetSizeOfLayout();
+    util::Log() << "Data static_layout has a size of " << encoded_static_layout.size() << " bytes";
     util::Log() << "Allocating shared memory of " << regions_size << " bytes";
     auto data_memory = makeSharedMemory(shm_key, regions_size);
 
-    // Copy memory layout to shared memory and populate data
+    // Copy memory static_layout to shared memory and populate data
     char *shared_memory_ptr = static_cast<char *>(data_memory->Ptr());
-    std::copy_n(encoded_layout.data(), encoded_layout.size(), shared_memory_ptr);
-    PopulateData(layout, shared_memory_ptr + encoded_layout.size());
+    std::copy_n(encoded_static_layout.data(), encoded_static_layout.size(), shared_memory_ptr);
+    PopulateData(static_layout, shared_memory_ptr + encoded_static_layout.size());
 
     std::uint32_t next_timestamp = 0;
     std::uint8_t in_use_key = SharedRegionRegister::MAX_SHM_KEYS;
@@ -212,14 +212,14 @@ int Storage::Run(int max_wait, const std::string &dataset_name)
  * memory needs to be allocated, and the position of each data structure
  * in that big block.  It updates the fields in the DataLayout parameter.
  */
-void Storage::PopulateLayout(DataLayout &layout)
+void Storage::PopulateLayout(DataLayout &static_layout)
 {
     {
         auto absolute_file_index_path =
             boost::filesystem::absolute(config.GetPath(".osrm.fileIndex"));
 
-        layout.SetBlock("/common/rtree/file_index_path",
-                        make_block<char>(absolute_file_index_path.string().length() + 1));
+        static_layout.SetBlock("/common/rtree/file_index_path",
+                               make_block<char>(absolute_file_index_path.string().length() + 1));
     }
 
     constexpr bool REQUIRED = true;
@@ -250,7 +250,7 @@ void Storage::PopulateLayout(DataLayout &layout)
     {
         if (boost::filesystem::exists(file.second))
         {
-            readBlocks(file.second, layout);
+            readBlocks(file.second, static_layout);
         }
         else
         {
@@ -263,7 +263,7 @@ void Storage::PopulateLayout(DataLayout &layout)
     }
 }
 
-void Storage::PopulateData(const DataLayout &layout, char *memory_ptr)
+void Storage::PopulateData(const DataLayout &static_layout, char *memory_ptr)
 {
     BOOST_ASSERT(memory_ptr != nullptr);
 
@@ -275,14 +275,14 @@ void Storage::PopulateData(const DataLayout &layout, char *memory_ptr)
     // store the filename of the on-disk portion of the RTree
     {
         const auto file_index_path_ptr =
-            layout.GetBlockPtr<char>(memory_ptr, "/common/rtree/file_index_path");
+            static_layout.GetBlockPtr<char>(memory_ptr, "/common/rtree/file_index_path");
         // make sure we have 0 ending
         std::fill(file_index_path_ptr,
-                  file_index_path_ptr + layout.GetBlockSize("/common/rtree/file_index_path"),
+                  file_index_path_ptr + static_layout.GetBlockSize("/common/rtree/file_index_path"),
                   0);
         const auto absolute_file_index_path =
             boost::filesystem::absolute(config.GetPath(".osrm.fileIndex")).string();
-        BOOST_ASSERT(static_cast<std::size_t>(layout.GetBlockSize(
+        BOOST_ASSERT(static_cast<std::size_t>(static_layout.GetBlockSize(
                          "/common/rtree/file_index_path")) >= absolute_file_index_path.size());
         std::copy(
             absolute_file_index_path.begin(), absolute_file_index_path.end(), file_index_path_ptr);
@@ -290,35 +290,36 @@ void Storage::PopulateData(const DataLayout &layout, char *memory_ptr)
 
     // Name data
     {
-        auto name_table = make_name_table_view(memory_ptr, layout, "/common/names");
+        auto name_table = make_name_table_view(memory_ptr, static_layout, "/common/names");
         extractor::files::readNames(config.GetPath(".osrm.names"), name_table);
     }
 
     // Turn lane data
     {
-        auto turn_lane_data = make_lane_data_view(memory_ptr, layout, "/common/turn_lanes");
+        auto turn_lane_data = make_lane_data_view(memory_ptr, static_layout, "/common/turn_lanes");
         extractor::files::readTurnLaneData(config.GetPath(".osrm.tld"), turn_lane_data);
     }
 
     // Turn lane descriptions
     {
-        auto views = make_turn_lane_description_views(memory_ptr, layout, "/common/turn_lanes");
+        auto views =
+            make_turn_lane_description_views(memory_ptr, static_layout, "/common/turn_lanes");
         extractor::files::readTurnLaneDescriptions(
             config.GetPath(".osrm.tls"), std::get<0>(views), std::get<1>(views));
     }
 
     // Load edge-based nodes data
     {
-        auto node_data = make_ebn_data_view(memory_ptr, layout, "/common/ebg_node_data");
+        auto node_data = make_ebn_data_view(memory_ptr, static_layout, "/common/ebg_node_data");
         extractor::files::readNodeData(config.GetPath(".osrm.ebg_nodes"), node_data);
     }
 
     // Load original edge data
     {
-        auto turn_data = make_turn_data_view(memory_ptr, layout, "/common/turn_data");
+        auto turn_data = make_turn_data_view(memory_ptr, static_layout, "/common/turn_data");
 
         auto connectivity_checksum_ptr =
-            layout.GetBlockPtr<std::uint32_t>(memory_ptr, "/common/connectivity_checksum");
+            static_layout.GetBlockPtr<std::uint32_t>(memory_ptr, "/common/connectivity_checksum");
 
         guidance::files::readTurnData(
             config.GetPath(".osrm.edges"), turn_data, *connectivity_checksum_ptr);
@@ -328,20 +329,21 @@ void Storage::PopulateData(const DataLayout &layout, char *memory_ptr)
 
     // load compressed geometry
     {
-        auto segment_data = make_segment_data_view(memory_ptr, layout, "/common/segment_data");
+        auto segment_data =
+            make_segment_data_view(memory_ptr, static_layout, "/common/segment_data");
         extractor::files::readSegmentData(config.GetPath(".osrm.geometry"), segment_data);
     }
 
     {
-        const auto datasources_names_ptr =
-            layout.GetBlockPtr<extractor::Datasources>(memory_ptr, "/common/data_sources_names");
+        const auto datasources_names_ptr = static_layout.GetBlockPtr<extractor::Datasources>(
+            memory_ptr, "/common/data_sources_names");
         extractor::files::readDatasources(config.GetPath(".osrm.datasource_names"),
                                           *datasources_names_ptr);
     }
 
     // Loading list of coordinates
     {
-        auto views = make_nbn_data_view(memory_ptr, layout, "/common/nbn_data");
+        auto views = make_nbn_data_view(memory_ptr, static_layout, "/common/nbn_data");
         extractor::files::readNodes(
             config.GetPath(".osrm.nbg_nodes"), std::get<0>(views), std::get<1>(views));
     }
@@ -349,7 +351,7 @@ void Storage::PopulateData(const DataLayout &layout, char *memory_ptr)
     // load turn weight penalties
     {
         auto turn_duration_penalties =
-            make_turn_weight_view(memory_ptr, layout, "/common/turn_penalty");
+            make_turn_weight_view(memory_ptr, static_layout, "/common/turn_penalty");
         extractor::files::readTurnWeightPenalty(config.GetPath(".osrm.turn_weight_penalties"),
                                                 turn_duration_penalties);
     }
@@ -357,14 +359,14 @@ void Storage::PopulateData(const DataLayout &layout, char *memory_ptr)
     // load turn duration penalties
     {
         auto turn_duration_penalties =
-            make_turn_duration_view(memory_ptr, layout, "/common/turn_penalty");
+            make_turn_duration_view(memory_ptr, static_layout, "/common/turn_penalty");
         extractor::files::readTurnDurationPenalty(config.GetPath(".osrm.turn_duration_penalties"),
                                                   turn_duration_penalties);
     }
 
     // store search tree portion of rtree
     {
-        auto rtree = make_search_tree_view(memory_ptr, layout, "/common/rtree");
+        auto rtree = make_search_tree_view(memory_ptr, static_layout, "/common/rtree");
         extractor::files::readRamIndex(config.GetPath(".osrm.ramIndex"), rtree);
     }
 
@@ -372,8 +374,8 @@ void Storage::PopulateData(const DataLayout &layout, char *memory_ptr)
     std::string metric_name;
     // load profile properties
     {
-        const auto profile_properties_ptr =
-            layout.GetBlockPtr<extractor::ProfileProperties>(memory_ptr, "/common/properties");
+        const auto profile_properties_ptr = static_layout.GetBlockPtr<extractor::ProfileProperties>(
+            memory_ptr, "/common/properties");
         extractor::files::readProfileProperties(config.GetPath(".osrm.properties"),
                                                 *profile_properties_ptr);
 
@@ -382,9 +384,10 @@ void Storage::PopulateData(const DataLayout &layout, char *memory_ptr)
 
     // Load intersection data
     {
-        auto intersection_bearings_view =
-            make_intersection_bearings_view(memory_ptr, layout, "/common/intersection_bearings");
-        auto entry_classes = make_entry_classes_view(memory_ptr, layout, "/common/entry_classes");
+        auto intersection_bearings_view = make_intersection_bearings_view(
+            memory_ptr, static_layout, "/common/intersection_bearings");
+        auto entry_classes =
+            make_entry_classes_view(memory_ptr, static_layout, "/common/entry_classes");
         extractor::files::readIntersections(
             config.GetPath(".osrm.icd"), intersection_bearings_view, entry_classes);
     }
@@ -392,7 +395,8 @@ void Storage::PopulateData(const DataLayout &layout, char *memory_ptr)
     if (boost::filesystem::exists(config.GetPath(".osrm.hsgr")))
     {
         const std::string metric_prefix = "/ch/metrics/" + metric_name;
-        auto contracted_metric = make_contracted_metric_view(memory_ptr, layout, metric_prefix);
+        auto contracted_metric =
+            make_contracted_metric_view(memory_ptr, static_layout, metric_prefix);
         std::unordered_map<std::string, contractor::ContractedMetricView> metrics = {
             {metric_name, std::move(contracted_metric)}};
 
@@ -412,20 +416,20 @@ void Storage::PopulateData(const DataLayout &layout, char *memory_ptr)
 
     if (boost::filesystem::exists(config.GetPath(".osrm.partition")))
     {
-        auto mlp = make_partition_view(memory_ptr, layout, "/mld/multilevelpartition");
+        auto mlp = make_partition_view(memory_ptr, static_layout, "/mld/multilevelpartition");
         partitioner::files::readPartition(config.GetPath(".osrm.partition"), mlp);
     }
 
     if (boost::filesystem::exists(config.GetPath(".osrm.cells")))
     {
-        auto storage = make_cell_storage_view(memory_ptr, layout, "/mld/cellstorage");
+        auto storage = make_cell_storage_view(memory_ptr, static_layout, "/mld/cellstorage");
         partitioner::files::readCells(config.GetPath(".osrm.cells"), storage);
     }
 
     if (boost::filesystem::exists(config.GetPath(".osrm.cell_metrics")))
     {
         auto exclude_metrics =
-            make_cell_metric_view(memory_ptr, layout, "/mld/metrics/" + metric_name);
+            make_cell_metric_view(memory_ptr, static_layout, "/mld/metrics/" + metric_name);
         std::unordered_map<std::string, std::vector<customizer::CellMetricView>> metrics = {
             {metric_name, std::move(exclude_metrics)},
         };
@@ -434,7 +438,8 @@ void Storage::PopulateData(const DataLayout &layout, char *memory_ptr)
 
     if (boost::filesystem::exists(config.GetPath(".osrm.mldgr")))
     {
-        auto graph_view = make_multi_level_graph_view(memory_ptr, layout, "/mld/multilevelgraph");
+        auto graph_view =
+            make_multi_level_graph_view(memory_ptr, static_layout, "/mld/multilevelgraph");
         std::uint32_t graph_connectivity_checksum = 0;
         partitioner::files::readGraph(
             config.GetPath(".osrm.mldgr"), graph_view, graph_connectivity_checksum);
@@ -452,7 +457,7 @@ void Storage::PopulateData(const DataLayout &layout, char *memory_ptr)
     // load maneuver overrides
     {
         auto views =
-            make_maneuver_overrides_views(memory_ptr, layout, "/common/maneuver_overrides");
+            make_maneuver_overrides_views(memory_ptr, static_layout, "/common/maneuver_overrides");
         extractor::files::readManeuverOverrides(
             config.GetPath(".osrm.maneuver_overrides"), std::get<0>(views), std::get<1>(views));
     }

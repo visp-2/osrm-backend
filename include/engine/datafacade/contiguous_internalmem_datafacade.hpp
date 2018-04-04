@@ -61,13 +61,13 @@ class ContiguousInternalMemoryAlgorithmDataFacade<CH> : public datafacade::Algor
             allocator->GetLayout(), allocator->GetMemory(), metric_name, exclude_index);
     }
 
-    void InitializeInternalPointers(const storage::DataLayout &data_layout,
+    void InitializeInternalPointers(const storage::DataLayout &static_layout,
                                     char *memory_block,
                                     const std::string &metric_name,
                                     const std::size_t exclude_index)
     {
         m_query_graph = make_filtered_graph_view(
-            memory_block, data_layout, "/ch/metrics/" + metric_name, exclude_index);
+            memory_block, static_layout, "/ch/metrics/" + metric_name, exclude_index);
     }
 
     // search graph access
@@ -172,7 +172,7 @@ class ContiguousInternalMemoryDataFacadeBase : public BaseDataFacade
     // allocator that keeps the allocation data
     std::shared_ptr<ContiguousBlockAllocator> allocator;
 
-    void InitializeInternalPointers(const storage::DataLayout &layout,
+    void InitializeInternalPointers(const storage::DataLayout &static_layout,
                                     char *memory_ptr,
                                     const std::string &metric_name,
                                     const std::size_t exclude_index)
@@ -180,47 +180,51 @@ class ContiguousInternalMemoryDataFacadeBase : public BaseDataFacade
         // TODO: For multi-metric support we need to have separate exclude classes per metric
         (void)metric_name;
 
-        m_profile_properties =
-            layout.GetBlockPtr<extractor::ProfileProperties>(memory_ptr, "/common/properties");
+        m_profile_properties = static_layout.GetBlockPtr<extractor::ProfileProperties>(
+            memory_ptr, "/common/properties");
 
         exclude_mask = m_profile_properties->excludable_classes[exclude_index];
 
         m_check_sum =
-            *layout.GetBlockPtr<std::uint32_t>(memory_ptr, "/common/connectivity_checksum");
+            *static_layout.GetBlockPtr<std::uint32_t>(memory_ptr, "/common/connectivity_checksum");
 
         std::tie(m_coordinate_list, m_osmnodeid_list) =
-            make_nbn_data_view(memory_ptr, layout, "/common/nbn_data");
+            make_nbn_data_view(memory_ptr, static_layout, "/common/nbn_data");
 
-        m_static_rtree = make_search_tree_view(memory_ptr, layout, "/common/rtree");
+        m_static_rtree = make_search_tree_view(memory_ptr, static_layout, "/common/rtree");
         m_geospatial_query.reset(
             new SharedGeospatialQuery(m_static_rtree, m_coordinate_list, *this));
 
-        edge_based_node_data = make_ebn_data_view(memory_ptr, layout, "/common/ebg_node_data");
+        edge_based_node_data =
+            make_ebn_data_view(memory_ptr, static_layout, "/common/ebg_node_data");
 
-        turn_data = make_turn_data_view(memory_ptr, layout, "/common/turn_data");
+        turn_data = make_turn_data_view(memory_ptr, static_layout, "/common/turn_data");
 
-        m_name_table = make_name_table_view(memory_ptr, layout, "/common/names");
+        m_name_table = make_name_table_view(memory_ptr, static_layout, "/common/names");
 
         std::tie(m_lane_description_offsets, m_lane_description_masks) =
-            make_turn_lane_description_views(memory_ptr, layout, "/common/turn_lanes");
-        m_lane_tupel_id_pairs = make_lane_data_view(memory_ptr, layout, "/common/turn_lanes");
+            make_turn_lane_description_views(memory_ptr, static_layout, "/common/turn_lanes");
+        m_lane_tupel_id_pairs =
+            make_lane_data_view(memory_ptr, static_layout, "/common/turn_lanes");
 
-        m_turn_weight_penalties = make_turn_weight_view(memory_ptr, layout, "/common/turn_penalty");
+        m_turn_weight_penalties =
+            make_turn_weight_view(memory_ptr, static_layout, "/common/turn_penalty");
         m_turn_duration_penalties =
-            make_turn_duration_view(memory_ptr, layout, "/common/turn_penalty");
+            make_turn_duration_view(memory_ptr, static_layout, "/common/turn_penalty");
 
-        segment_data = make_segment_data_view(memory_ptr, layout, "/common/segment_data");
+        segment_data = make_segment_data_view(memory_ptr, static_layout, "/common/segment_data");
 
-        m_datasources =
-            layout.GetBlockPtr<extractor::Datasources>(memory_ptr, "/common/data_sources_names");
+        m_datasources = static_layout.GetBlockPtr<extractor::Datasources>(
+            memory_ptr, "/common/data_sources_names");
 
-        intersection_bearings_view =
-            make_intersection_bearings_view(memory_ptr, layout, "/common/intersection_bearings");
+        intersection_bearings_view = make_intersection_bearings_view(
+            memory_ptr, static_layout, "/common/intersection_bearings");
 
-        m_entry_class_table = make_entry_classes_view(memory_ptr, layout, "/common/entry_classes");
+        m_entry_class_table =
+            make_entry_classes_view(memory_ptr, static_layout, "/common/entry_classes");
 
         std::tie(m_maneuver_overrides, m_maneuver_override_node_sequences) =
-            make_maneuver_overrides_views(memory_ptr, layout, "/common/maneuver_overrides");
+            make_maneuver_overrides_views(memory_ptr, static_layout, "/common/maneuver_overrides");
     }
 
   public:
@@ -661,16 +665,17 @@ template <> class ContiguousInternalMemoryAlgorithmDataFacade<MLD> : public Algo
 
     QueryGraph query_graph;
 
-    void InitializeInternalPointers(const storage::DataLayout &layout,
+    void InitializeInternalPointers(const storage::DataLayout &static_layout,
                                     char *memory_ptr,
                                     const std::string &metric_name,
                                     const std::size_t exclude_index)
     {
-        mld_partition = make_partition_view(memory_ptr, layout, "/mld/multilevelpartition");
+        mld_partition = make_partition_view(memory_ptr, static_layout, "/mld/multilevelpartition");
         mld_cell_metric = make_filtered_cell_metric_view(
-            memory_ptr, layout, "/mld/metrics/" + metric_name, exclude_index);
-        mld_cell_storage = make_cell_storage_view(memory_ptr, layout, "/mld/cellstorage");
-        query_graph = make_multi_level_graph_view(memory_ptr, layout, "/mld/multilevelgraph");
+            memory_ptr, static_layout, "/mld/metrics/" + metric_name, exclude_index);
+        mld_cell_storage = make_cell_storage_view(memory_ptr, static_layout, "/mld/cellstorage");
+        query_graph =
+            make_multi_level_graph_view(memory_ptr, static_layout, "/mld/multilevelgraph");
     }
 
     // allocator that keeps the allocation data
