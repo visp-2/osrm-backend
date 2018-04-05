@@ -54,7 +54,7 @@ class UnpackingCache
     //     = n * std::size_t
     //     = n * 8 bytes
     // Total = n * 20 bytes
-    // Total cache size: 500 mb = 500 * 1024 *1024 bytes = 524288000 bytes
+    // Total cache size: 500 mb = 1000 * 1024 *1024 bytes = 524288000 bytes
 
     // THREAD LOCAL STORAGE
     // Number of lines we need  = 524288000 / 20 / number of threads = 26214400 / number of threads
@@ -64,9 +64,11 @@ class UnpackingCache
     // 2 threads: 26214400 / 2 = 13107200
 
     // SHARED STORAGE CACHE
-    // Number of lines we need for shared storage cache = 524288000 / 20 = 26214400
+    // Number of lines for shared storage cache 1000 mb = 1048576000 / 20 = 52428800
+    // Number of lines for shared storage cache 500 mb = 524288000 / 20 = 26214400
+    // Number of lines for shared storage cache 250 mb = 262144000 / 20 = 13107200
 
-    UnpackingCache() : m_cache(26214400){};
+    UnpackingCache() : m_cache(52428800){};
 
     UnpackingCache(std::size_t cache_size) : m_cache(cache_size){};
 
