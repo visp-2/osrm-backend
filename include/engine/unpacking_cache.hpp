@@ -44,17 +44,29 @@ class UnpackingCache
     // TO FIGURE OUT HOW MANY LINES TO INITIALIZE CACHE TO:
     // Assume max cache size is 500mb (see bottom of OP here:
     // https://github.com/Project-OSRM/osrm-backend/issues/4798#issue-288608332)
-    // Total cache size: 500 mb = 500 * 1024 *1024 bytes = 524288000 bytes
-    // Assume unsigned char is 1 byte (my local machine this is the case):
-    // Current cache line = NodeID * 2 + unsigned char * 1 + EdgeDuration * 1
-    //                    = std::uint32_t * 2 + unsigned char * 1 + std::int32_t * 1
-    //                    = 4 bytes * 3 + 1 byte = 13 bytes
-    // Number of cache lines is 500 mb = 500 * 1024 *1024 bytes = 524288000 bytes / 13 = 40329846
-    // For threadlocal cache, Number of cache lines = max cache size / number of threads
-    //                                              (Assume that the number of threads is 16)
-    //                                              = 40329846 / 16 = 2520615
 
-    UnpackingCache() : m_cache(40329846){};
+    // LRU CACHE IMPLEMENTATION HAS THESE TWO STORAGE CONTAINERS
+    // map: n * tuple_hash + n * EdgeDuration
+    //    = n * std::size_t + n * std::int32_t
+    //    = n * 8 bytes + n * 4 bytes
+    //    = n * 12 bytes
+    // list: n * HashedKey
+    //     = n * std::size_t
+    //     = n * 8 bytes
+    // Total = n * 20 bytes
+    // Total cache size: 500 mb = 500 * 1024 *1024 bytes = 524288000 bytes
+
+    // THREAD LOCAL STORAGE
+    // Number of lines we need  = 524288000 / 20 / number of threads = 26214400 / number of threads
+    // 16 threads: 26214400 / 16 = 1638400
+    // 8 threads: 26214400 / 8 = 3276800
+    // 4 threads: 26214400 / 4 = 6553600
+    // 2 threads: 26214400 / 2 = 13107200
+
+    // SHARED STORAGE CACHE
+    // Number of lines we need for shared storage cache = 524288000 / 20 = 26214400
+
+    UnpackingCache() : m_cache(26214400){};
 
     UnpackingCache(std::size_t cache_size) : m_cache(cache_size){};
 
