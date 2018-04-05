@@ -68,7 +68,7 @@ class UnpackingCache
     // Number of lines for shared storage cache 500 mb = 524288000 / 20 = 26214400
     // Number of lines for shared storage cache 250 mb = 262144000 / 20 = 13107200
 
-    UnpackingCache() : m_cache(52428800){};
+    UnpackingCache() : m_cache(13107200){};
 
     UnpackingCache(std::size_t cache_size) : m_cache(cache_size){};
 
