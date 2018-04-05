@@ -12,20 +12,33 @@ namespace osrm
 namespace engine
 {
 typedef unsigned char ExcludeIndex;
-typedef unsigned char Generation;
 typedef unsigned Timestamp;
+typedef std::tuple<NodeID, NodeID, ExcludeIndex, Timestamp> Key;
+typedef std::size_t HashedKey;
+
+struct HashKey
+{
+    std::size_t operator()(Key const &key) const noexcept
+    {
+        std::size_t h1 = std::hash<NodeID>{}(std::get<0>(key));
+        std::size_t h2 = std::hash<NodeID>{}(std::get<1>(key));
+        std::size_t h3 = std::hash<ExcludeIndex>{}(std::get<2>(key));
+        std::size_t h4 = std::hash<Timestamp>{}(std::get<3>(key));
+
+        std::size_t seed = 0;
+        boost::hash_combine(seed, h1);
+        boost::hash_combine(seed, h2);
+        boost::hash_combine(seed, h3);
+        boost::hash_combine(seed, h4);
+
+        return seed;
+    }
+};
 class UnpackingCache
 {
   private:
-    boost::compute::detail::lru_cache<std::tuple<NodeID, NodeID, ExcludeIndex, Generation>,
-                                      EdgeDuration>
-        m_cache;
+    boost::compute::detail::lru_cache<HashedKey, EdgeDuration> m_cache;
     boost::shared_mutex m_shared_access;
-    Generation m_current_gen = 1;
-    Generation m_old_gen = 2;
-    Timestamp m_current_time = 0;
-    Timestamp m_old_time = 0;
-    std::tuple<NodeID, NodeID, ExcludeIndex, Generation> m_edge;
 
   public:
     // TO FIGURE OUT HOW MANY LINES TO INITIALIZE CACHE TO:
@@ -45,49 +58,25 @@ class UnpackingCache
 
     UnpackingCache(std::size_t cache_size) : m_cache(cache_size){};
 
-    bool IsEdgeInCache(std::tuple<NodeID, NodeID, ExcludeIndex, Timestamp> edge)
+    bool IsEdgeInCache(Key edge)
     {
-        std::get<0>(m_edge) = std::get<0>(edge);
-        std::get<1>(m_edge) = std::get<1>(edge);
-        std::get<2>(m_edge) = std::get<2>(edge);
-        std::get<3>(m_edge) = m_current_gen;
-
-        if (std::get<3>(edge) > m_current_time)
-        {
-            std::get<3>(m_edge) = m_new_gen;
-        }
+        HashedKey hashed_edge = HashKey{}(edge);
         boost::shared_lock<boost::shared_mutex> lock(m_shared_access);
-        return m_cache.contains(m_edge);
+        return m_cache.contains(hashed_edge);
     }
 
-    void AddEdge(std::tuple<NodeID, NodeID, ExcludeIndex, Timestamp> edge, EdgeDuration duration)
+    void AddEdge(Key edge, EdgeDuration duration)
     {
-        std::get<0>(m_edge) = std::get<0>(edge);
-        std::get<1>(m_edge) = std::get<1>(edge);
-        std::get<2>(m_edge) = std::get<2>(edge);
-        std::get<3>(m_edge) = m_current_gen;
-
-        if (std::get<3>(edge) > m_current_time)
-        {
-            std::get<3>(m_edge) = m_new_gen;
-        }
+        HashedKey hashed_edge = HashKey{}(edge);
         boost::unique_lock<boost::shared_mutex> lock(m_shared_access);
-        m_cache.insert(m_edge, duration);
+        m_cache.insert(hashed_edge, duration);
     }
 
-    EdgeDuration GetDuration(std::tuple<NodeID, NodeID, ExcludeIndex, Timestamp> edge)
+    EdgeDuration GetDuration(Key edge)
     {
-        std::get<0>(m_edge) = std::get<0>(edge);
-        std::get<1>(m_edge) = std::get<1>(edge);
-        std::get<2>(m_edge) = std::get<2>(edge);
-        std::get<3>(m_edge) = m_current_gen;
-
-        if (std::get<3>(edge) > m_current_time)
-        {
-            std::get<3>(m_edge) = m_new_gen;
-        }
+        HashedKey hashed_edge = HashKey{}(edge);
         boost::shared_lock<boost::shared_mutex> lock(m_shared_access);
-        boost::optional<EdgeDuration> duration = m_cache.get(m_edge);
+        boost::optional<EdgeDuration> duration = m_cache.get(hashed_edge);
         return duration ? *duration : MAXIMAL_EDGE_DURATION;
     }
 };
