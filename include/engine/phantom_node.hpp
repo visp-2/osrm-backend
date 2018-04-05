@@ -49,10 +49,10 @@ struct PhantomNode
           reverse_weight(INVALID_EDGE_WEIGHT), forward_weight_offset(0), reverse_weight_offset(0),
           forward_distance(MAXIMAL_EDGE_DISTANCE), reverse_distance(MAXIMAL_EDGE_DISTANCE),
           forward_distance_offset(0), reverse_distance_offset(0),
-          forward_duration(MAXIMAL_EDGE_DURATION), reverse_duration(MAXIMAL_EDGE_DURATION), forward_duration_offset(0),
-          reverse_duration_offset(0), fwd_segment_position(0), is_valid_forward_source{false},
-          is_valid_forward_target{false}, is_valid_reverse_source{false},
-          is_valid_reverse_target{false}, bearing(0)
+          forward_duration(MAXIMAL_EDGE_DURATION), reverse_duration(MAXIMAL_EDGE_DURATION),
+          forward_duration_offset(0), reverse_duration_offset(0), fwd_segment_position(0),
+          is_valid_forward_source{false}, is_valid_forward_target{false},
+          is_valid_reverse_source{false}, is_valid_reverse_target{false}, bearing(0)
 
     {
     }
@@ -83,13 +83,13 @@ struct PhantomNode
 
     // DO THIS FOR DISTANCE
 
-    EdgeWeight GetForwardDistance() const
+    EdgeDistance GetForwardDistance() const
     {
         BOOST_ASSERT(forward_segment_id.enabled);
         return forward_distance + forward_distance_offset;
     }
 
-    EdgeWeight GetReverseDistance() const
+    EdgeDistance GetReverseDistance() const
     {
         BOOST_ASSERT(reverse_segment_id.enabled);
         return reverse_distance + reverse_distance_offset;
@@ -149,14 +149,14 @@ struct PhantomNode
                          EdgeWeight reverse_weight,
                          EdgeWeight forward_weight_offset,
                          EdgeWeight reverse_weight_offset,
-                         EdgeWeight forward_duration,
-                         EdgeWeight reverse_duration,
-                         EdgeWeight forward_duration_offset,
-                         EdgeWeight reverse_duration_offset,
                          EdgeDistance forward_distance,
                          EdgeDistance reverse_distance,
                          EdgeDistance forward_distance_offset,
                          EdgeDistance reverse_distance_offset,
+                         EdgeWeight forward_duration,
+                         EdgeWeight reverse_duration,
+                         EdgeWeight forward_duration_offset,
+                         EdgeWeight reverse_duration_offset,
                          bool is_valid_forward_source,
                          bool is_valid_forward_target,
                          bool is_valid_reverse_source,
@@ -171,7 +171,7 @@ struct PhantomNode
           reverse_distance{reverse_distance}, forward_distance_offset{forward_distance_offset},
           reverse_distance_offset{reverse_distance_offset}, forward_duration{forward_duration},
           reverse_duration{reverse_duration}, forward_duration_offset{forward_duration_offset},
-          reverse_duration_offset{reverse_duration_offset}, 
+          reverse_duration_offset{reverse_duration_offset},
           component{component.id, component.is_tiny}, location{location},
           input_location{input_location}, fwd_segment_position{other.fwd_segment_position},
           is_valid_forward_source{is_valid_forward_source},

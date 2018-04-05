@@ -508,7 +508,7 @@ template <typename RTreeT, typename DataFacadeT> class GeospatialQuery
             reverse_duration_range[reverse_duration_range.size() - data.fwd_segment_position - 1];
         EdgeDistance reverse_distance = util::coordinate_calculation::haversineDistance(
             datafacade.GetCoordinateOfNode(reverse_geometry_range[reverse_geometry_range.size() -
-                                                              data.fwd_segment_position - 1]),
+                                                                  data.fwd_segment_position - 1]),
             point_on_segment);
 
         ratio = std::min(1.0, std::max(0.0, ratio));
@@ -546,10 +546,10 @@ template <typename RTreeT, typename DataFacadeT> class GeospatialQuery
                         reverse_weight,
                         forward_weight_offset,
                         reverse_weight_offset,
-                        static_cast<EdgeDistance>(forward_distance),
-                        static_cast<EdgeDistance>(reverse_distance),
-                        static_cast<EdgeDistance>(forward_distance_offset),
-                        static_cast<EdgeDistance>(reverse_distance_offset),
+                        forward_distance,
+                        reverse_distance,
+                        forward_distance_offset,
+                        reverse_distance_offset,
                         forward_duration,
                         reverse_duration,
                         forward_duration_offset,
