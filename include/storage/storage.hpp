@@ -46,8 +46,10 @@ class Storage
 
     int Run(int max_wait, const std::string &name);
 
-    void PopulateLayout(DataLayout &layout);
-    void PopulateData(const DataLayout &layout, char *memory_ptr);
+    void PopulateStaticLayout(DataLayout &layout);
+    void PopulateStaticData(const DataLayout &layout, char *memory_ptr);
+    void PopulateUpdatableLayout(DataLayout &layout);
+    void PopulateUpdatableData(const DataLayout &layout, char *memory_ptr);
 
   private:
     StorageConfig config;
